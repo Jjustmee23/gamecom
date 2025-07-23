@@ -1,16 +1,22 @@
 version: '3.8'
 
 services:
-  # Redis for sessions and caching
-  redis:
-    image: redis:7-alpine
-    container_name: gamecom-redis
-    ports:
-      - "6379:6379"
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: gamecom-postgres
+    environment:
+      POSTGRES_DB: gamecom
+      POSTGRES_USER: gamecom
+      POSTGRES_PASSWORD: gamecom_password
     volumes:
-      - redis_data:/data
+      - postgres_data:/var/lib/postgresql/data
+      - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
     networks:
       - gamecom-network
+    restart: unless-stopped
 
   # Backend API
   backend:
@@ -19,22 +25,22 @@ services:
       dockerfile: Dockerfile
     container_name: gamecom-backend
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://danny:Jjustmee12773@45.154.238.111:5432/gamecom
-      REDIS_URL: redis://redis:6379
-      JWT_SECRET: your-super-secret-jwt-key-change-in-production
-      STEAM_API_KEY: ${STEAM_API_KEY}
+      NODE_ENV: production
       PORT: 3001
-    ports:
-      - "3001:3001"
+      DATABASE_URL: postgresql://gamecom:gamecom_password@postgres:5432/gamecom
+      JWT_SECRET: your-super-secret-jwt-key-change-this-in-production
+      FRONTEND_URL: https://com.midaweb.be
+      STEAM_API_KEY: ${STEAM_API_KEY:-}
     volumes:
       - ./backend:/app
       - /app/node_modules
+    ports:
+      - "3001:3001"
     depends_on:
-      - redis
+      - postgres
     networks:
       - gamecom-network
-    command: npm run dev
+    restart: unless-stopped
 
   # Frontend React App
   frontend:
@@ -43,22 +49,54 @@ services:
       dockerfile: Dockerfile
     container_name: gamecom-frontend
     environment:
-      VITE_API_URL: http://localhost:3001
-      VITE_WS_URL: ws://localhost:3001
-      VITE_ALLOWED_HOSTS: "localhost,127.0.0.1,gamecom.midaweb.be,com.midaweb.be,.midaweb.be"
-    ports:
-      - "3000:3000"
+      VITE_API_URL: https://com.midaweb.be/api
+      VITE_WS_URL: wss://com.midaweb.be
     volumes:
       - ./frontend:/app
       - /app/node_modules
+    ports:
+      - "3000:3000"
     depends_on:
       - backend
     networks:
       - gamecom-network
-    command: npm run dev
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy with SSL
+  nginx:
+    image: nginx:alpine
+    container_name: gamecom-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./ssl:/etc/nginx/ssl
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - gamecom-network
+    restart: unless-stopped
+
+  # Certbot for SSL certificates
+  certbot:
+    image: certbot/certbot
+    container_name: gamecom-certbot
+    volumes:
+      - ./certbot/conf:/etc/letsencrypt
+      - ./certbot/www:/var/www/certbot
+    command: certonly --webroot --webroot-path=/var/www/certbot --email info@midaweb.be --agree-tos --no-eff-email -d com.midaweb.be
+    depends_on:
+      - nginx
+    networks:
+      - gamecom-network
 
 volumes:
-  redis_data:
+  postgres_data:
 
 networks:
   gamecom-network:
