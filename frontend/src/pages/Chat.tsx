@@ -387,7 +387,7 @@ const Chat: React.FC = () => {
                       </Avatar>
                       <div className={`absolute -bottom-1 -right-1 w-3 h-3 rounded-full border-2 border-slate-800 ${getStatusColor(friend.status)}`} />
                     </div>
-                    <div>
+      <div>
                       <p className="text-sm font-medium text-white">{friend.username}</p>
                       <p className="text-xs text-gray-400">
                         {friend.isOnline ? friend.status : `Last seen ${friend.lastSeen?.toLocaleTimeString()}`}
@@ -463,7 +463,7 @@ const Chat: React.FC = () => {
           )}
         </div>
       </div>
-
+      
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         {selectedChat ? (

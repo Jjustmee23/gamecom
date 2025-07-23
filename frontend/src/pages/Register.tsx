@@ -200,7 +200,7 @@ const Register: React.FC = () => {
             <Link to="/login" className="text-purple-400 hover:text-purple-300 font-medium">
               Sign in
             </Link>
-          </div>
+      </div>
         </CardContent>
       </Card>
     </div>

@@ -299,7 +299,7 @@ const Profile: React.FC = () => {
                   {profile.username.charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
-              <div>
+      <div>
                 <h1 className="text-3xl font-bold">{profile.username}</h1>
                 <p className="text-gray-300">Level {profile.level} • {profile.achievements} achievements</p>
               </div>
@@ -329,7 +329,7 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </div>
-
+      
       <div className="container mx-auto px-4 py-8">
         {/* Tabs */}
         <div className="flex items-center gap-1 mb-8 bg-slate-800 rounded-lg p-1">

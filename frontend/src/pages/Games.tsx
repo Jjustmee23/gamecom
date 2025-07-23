@@ -773,7 +773,7 @@ const Games: React.FC = () => {
 
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
+      <div>
           <h1 className="text-3xl font-bold text-white">Games Library</h1>
           <p className="text-gray-400 mt-1">Discover and explore amazing games</p>
         </div>
@@ -783,7 +783,7 @@ const Games: React.FC = () => {
           </Badge>
         </div>
       </div>
-
+      
       {/* Filters */}
       <Card className="bg-slate-800 border-slate-700">
         <CardContent className="p-4">

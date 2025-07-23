@@ -605,7 +605,7 @@ router.post('/:id/library', async (req: any, res: any) => {
     const userId = req.user?.id;
     const gameId = parseInt(req.params.id);
     const { isFavorite = false, isWishlisted = false } = req.body;
-
+    
     if (!userId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
@@ -706,7 +706,7 @@ router.delete('/:id/library', async (req: any, res: any) => {
 router.get('/library/user', async (req: any, res: any) => {
   try {
     const userId = req.user?.id;
-
+    
     if (!userId) {
       return res.status(401).json({ message: 'User not authenticated' });
     }
