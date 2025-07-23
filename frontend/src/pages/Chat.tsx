@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -63,6 +64,7 @@ interface ChatRoom {
 const Chat: React.FC = () => {
   const { socket } = useSocket();
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [selectedChat, setSelectedChat] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [newMessage, setNewMessage] = useState('');
@@ -150,6 +152,37 @@ const Chat: React.FC = () => {
     setFriends(mockFriends);
     setChatRooms(mockChatRooms);
   }, []);
+
+  // Check for URL parameters to start a direct message
+  useEffect(() => {
+    const targetUserId = searchParams.get('user');
+    const targetUsername = searchParams.get('username');
+    
+    if (targetUserId && targetUsername) {
+      // Create a direct chat room with the target user
+      const directChat: ChatRoom = {
+        id: `direct-${targetUserId}`,
+        name: targetUsername,
+        type: 'direct',
+        participants: [
+          {
+            id: targetUserId,
+            username: targetUsername,
+            status: 'online',
+            isFriend: false,
+            isOnline: true
+          }
+        ],
+        unreadCount: 0
+      };
+      
+      setSelectedChat(directChat);
+      setShowFriends(false);
+      
+      // Clear URL parameters
+      window.history.replaceState({}, '', '/chat');
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (selectedChat) {

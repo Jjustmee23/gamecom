@@ -16,7 +16,8 @@ import {
   UserX,
   Calendar,
   Award,
-  TrendingUp
+  TrendingUp,
+  MessageSquare
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import toast from 'react-hot-toast';
@@ -177,6 +178,13 @@ const WallOfGamers = () => {
       toast.error('Failed to reject friend request');
       console.error('Error rejecting friend request:', error);
     }
+  };
+
+  // Send message to user
+  const sendMessage = (userId: number, username: string) => {
+    // Navigate to chat with the user
+    navigate(`/chat?user=${userId}&username=${encodeURIComponent(username)}`);
+    setShowProfileModal(false);
   };
 
   useEffect(() => {
@@ -511,8 +519,21 @@ const WallOfGamers = () => {
                 </div>
               )}
 
+              {/* Action Buttons */}
+              {currentUser && currentUser.id !== selectedUser.user.id && (
+                <div className="flex items-center justify-center space-x-4 pt-6 border-t border-slate-700">
+                  <Button
+                    onClick={() => sendMessage(selectedUser.user.id, selectedUser.user.username)}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <MessageSquare className="h-4 w-4 mr-2" />
+                    Send Message
+                  </Button>
+                </div>
+              )}
+
               {/* Member Since */}
-              <div className="text-center text-gray-400 text-sm">
+              <div className="text-center text-gray-400 text-sm mt-6">
                 Member since {new Date(selectedUser.user.created_at).toLocaleDateString()}
               </div>
             </div>

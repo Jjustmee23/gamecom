@@ -63,9 +63,10 @@ app.use(express.urlencoded({ extended: true }));
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({ 
-    status: 'OK', 
+    status: 'healthy', 
     timestamp: new Date().toISOString(),
-    database: 'connected'
+    uptime: process.uptime(),
+    version: process.env.npm_package_version || '1.0.0'
   });
 });
 
