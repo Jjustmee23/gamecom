@@ -10,7 +10,7 @@ import { Client } from 'pg';
 import authRoutes from './routes/auth';
 import gameRoutes from './routes/games';
 import chatRoutes from './routes/chat';
-// import steamRoutes from './routes/steam';
+import userRoutes from './routes/users';
 
 const app = express();
 const server = createServer(app);
@@ -73,7 +73,7 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/games', gameRoutes);
 app.use('/api/chat', chatRoutes);
-// app.use('/api/steam', steamRoutes);
+app.use('/api/users', userRoutes);
 
 // Socket.io connection handling
 io.on('connection', (socket) => {
@@ -110,39 +110,20 @@ app.use('*', (req, res) => {
   res.status(404).json({ message: 'Route not found' });
 });
 
-const PORT = process.env.PORT || 3001;
-
-// Start server only after database connection is established
 async function startServer() {
   const dbConnected = await testConnection();
   
-  if (dbConnected) {
-    server.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📊 Health check: http://localhost:${PORT}/health`);
-      console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
-    });
-  } else {
-    console.error('❌ Failed to start server due to database connection issues');
+  if (!dbConnected) {
+    console.error('❌ Failed to connect to database. Exiting...');
     process.exit(1);
   }
+
+  const port = process.env.PORT || 3001;
+  server.listen(port, () => {
+    console.log(`🚀 Server running on port ${port}`);
+    console.log(`📊 Health check: http://localhost:${port}/health`);
+    console.log(`🔗 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+  });
 }
 
-startServer();
-
-// Graceful shutdown
-process.on('SIGTERM', async () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  await client.end();
-  server.close(() => {
-    console.log('Process terminated');
-  });
-});
-
-process.on('SIGINT', async () => {
-  console.log('SIGINT received, shutting down gracefully');
-  await client.end();
-  server.close(() => {
-    console.log('Process terminated');
-  });
-}); 
+startServer().catch(console.error);
