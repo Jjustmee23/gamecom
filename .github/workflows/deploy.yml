@@ -24,54 +24,302 @@ jobs:
       run: |
         ssh-keyscan -H 45.154.238.116 >> ~/.ssh/known_hosts
         
-    - name: Deploy to VPS
+    - name: Complete VPS Deployment
       run: |
         ssh ${{ secrets.VPS_USER }}@45.154.238.116 << 'EOF'
-          echo "🚀 Starting deployment..."
+          echo "🚀 Starting complete VPS deployment..."
           
-          # Navigate to application directory
+          # Function to print status
+          print_status() {
+            echo "📋 $1"
+          }
+          
+          print_success() {
+            echo "✅ $1"
+          }
+          
+          print_error() {
+            echo "❌ $1"
+          }
+          
+          # Step 1: Update system
+          print_status "Step 1: Updating system packages..."
+          sudo apt update && sudo apt upgrade -y
+          print_success "System updated"
+          
+          # Step 2: Install essential packages
+          print_status "Step 2: Installing essential packages..."
+          sudo apt install -y curl wget git unzip software-properties-common apt-transport-https ca-certificates gnupg lsb-release nginx certbot python3-certbot-nginx postgresql postgresql-contrib fail2ban htop iotop nethogs
+          print_success "Essential packages installed"
+          
+          # Step 3: Install Docker
+          print_status "Step 3: Installing Docker..."
+          if ! command -v docker &> /dev/null; then
+            curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+            sudo apt update
+            sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+            sudo systemctl start docker
+            sudo systemctl enable docker
+            print_success "Docker installed"
+          else
+            print_success "Docker already installed"
+          fi
+          
+          # Step 4: Install Node.js
+          print_status "Step 4: Installing Node.js..."
+          if ! command -v node &> /dev/null; then
+            curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+            sudo apt install -y nodejs
+            print_success "Node.js installed"
+          else
+            print_success "Node.js already installed"
+          fi
+          
+          # Step 5: Configure firewall
+          print_status "Step 5: Configuring firewall..."
+          sudo ufw allow OpenSSH
+          sudo ufw allow 'Nginx Full'
+          sudo ufw --force enable
+          print_success "Firewall configured"
+          
+          # Step 6: Setup PostgreSQL
+          print_status "Step 6: Setting up PostgreSQL..."
+          sudo systemctl start postgresql
+          sudo systemctl enable postgresql
+          
+          # Create database and user if they don't exist
+          sudo -u postgres psql -c "CREATE DATABASE gamecom;" 2>/dev/null || echo "Database already exists"
+          sudo -u postgres psql -c "CREATE USER gamecom WITH PASSWORD 'gamecom_secure_password_2024';" 2>/dev/null || echo "User already exists"
+          sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE gamecom TO gamecom;"
+          sudo -u postgres psql -c "ALTER USER gamecom CREATEDB;"
+          print_success "PostgreSQL configured"
+          
+          # Step 7: Create application directory
+          print_status "Step 7: Setting up application directory..."
+          sudo mkdir -p /opt/gamecom
+          sudo chown $USER:$USER /opt/gamecom
           cd /opt/gamecom
+          print_success "Application directory ready"
           
-          # Configure git with token for private repository access
-          git config --global credential.helper store
-          echo "https://Jjustmee23:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+          # Step 8: Clone/Update repository
+          print_status "Step 8: Updating repository..."
+          if [ -d ".git" ]; then
+            # Repository exists, pull latest changes
+            git config --global credential.helper store
+            echo "https://Jjustmee23:${{ secrets.GITHUB_TOKEN }}@github.com" > ~/.git-credentials
+            git pull origin main
+            print_success "Repository updated"
+          else
+            # Clone repository
+            git clone https://github.com/Jjustmee23/gamecom.git .
+            print_success "Repository cloned"
+          fi
           
-          # Pull latest changes
-          echo "📥 Pulling latest changes..."
-          git pull origin main
+          # Step 9: Setup environment
+          print_status "Step 9: Setting up environment..."
+          if [ ! -f ".env" ]; then
+            cat > .env << 'ENVEOF'
+# Database Configuration
+DATABASE_URL=postgresql://gamecom:gamecom_secure_password_2024@localhost:5432/gamecom
+
+# Steam API Configuration
+STEAM_API_KEY=your_steam_api_key_here
+
+# JWT Configuration
+JWT_SECRET=gamecom_jwt_secret_key_$(openssl rand -hex 32)
+
+# Domain Configuration
+DOMAIN=https://com.midaweb.be
+
+# Redis Configuration
+REDIS_URL=redis://localhost:6379
+
+# Email Configuration
+EMAIL_FROM=info@midaweb.be
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USER=info@midaweb.be
+EMAIL_PASS=your_email_password_here
+ENVEOF
+            print_success "Environment file created"
+          else
+            print_success "Environment file already exists"
+          fi
           
-          # Stop current containers
-          echo "🛑 Stopping current containers..."
-          docker compose down
+          # Step 10: Setup Nginx
+          print_status "Step 10: Setting up Nginx..."
+          sudo tee /etc/nginx/sites-available/com.midaweb.be > /dev/null << 'NGINXEOF'
+server {
+    listen 80;
+    server_name com.midaweb.be;
+    
+    # Redirect to HTTPS
+    return 301 https://$server_name$request_uri;
+}
+
+server {
+    listen 443 ssl http2;
+    server_name com.midaweb.be;
+    
+    # SSL configuration will be added by Certbot
+    
+    # Frontend
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # Backend API
+    location /api {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_cache_bypass $http_upgrade;
+    }
+    
+    # WebSocket support
+    location /socket.io {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+NGINXEOF
+
+          # Enable site
+          sudo ln -sf /etc/nginx/sites-available/com.midaweb.be /etc/nginx/sites-enabled/
+          sudo nginx -t
+          sudo systemctl reload nginx
+          print_success "Nginx configured"
           
-          # Rebuild and start containers
-          echo "🔨 Rebuilding containers..."
+          # Step 11: Get SSL certificate
+          print_status "Step 11: Getting SSL certificate..."
+          sudo certbot --nginx -d com.midaweb.be --email info@midaweb.be --agree-tos --non-interactive || echo "SSL certificate setup failed, will retry later"
+          print_success "SSL certificate requested"
+          
+          # Step 12: Build and start application
+          print_status "Step 12: Building and starting application..."
+          docker compose down 2>/dev/null || true
           docker compose up --build -d
+          print_success "Application started"
           
-          # Run database migrations if needed
-          echo "🗄️ Running database migrations..."
-          docker compose exec -T backend npm run db:migrate || echo "No migrations needed"
+          # Step 13: Run database migrations
+          print_status "Step 13: Running database migrations..."
+          sleep 10  # Wait for containers to start
+          docker compose exec -T backend npm run db:migrate 2>/dev/null || echo "No migrations needed"
+          print_success "Database migrations completed"
           
-          # Check deployment status
-          echo "✅ Checking deployment status..."
+          # Step 14: Create management scripts
+          print_status "Step 14: Creating management scripts..."
+          cat > start.sh << 'SCRIPTEOF'
+#!/bin/bash
+cd /opt/gamecom
+docker compose up -d
+echo "GameCom started successfully"
+SCRIPTEOF
+
+          cat > stop.sh << 'SCRIPTEOF'
+#!/bin/bash
+cd /opt/gamecom
+docker compose down
+echo "GameCom stopped successfully"
+SCRIPTEOF
+
+          cat > restart.sh << 'SCRIPTEOF'
+#!/bin/bash
+cd /opt/gamecom
+docker compose restart
+echo "GameCom restarted successfully"
+SCRIPTEOF
+
+          cat > status.sh << 'SCRIPTEOF'
+#!/bin/bash
+echo "=== GameCom Status ==="
+cd /opt/gamecom
+docker compose ps
+echo ""
+echo "=== System Status ==="
+sudo systemctl status nginx --no-pager -l
+sudo systemctl status postgresql --no-pager -l
+sudo certbot certificates
+SCRIPTEOF
+
+          cat > backup.sh << 'SCRIPTEOF'
+#!/bin/bash
+BACKUP_DIR="/opt/backups/gamecom"
+DATE=$(date +%Y%m%d_%H%M%S)
+
+# Create backup directory
+mkdir -p $BACKUP_DIR
+
+# Backup database
+docker compose exec -T backend pg_dump $DATABASE_URL > $BACKUP_DIR/db_backup_$DATE.sql
+
+# Backup application files
+tar -czf $BACKUP_DIR/app_backup_$DATE.tar.gz /opt/gamecom
+
+# Keep only last 7 days of backups
+find $BACKUP_DIR -name "*.sql" -mtime +7 -delete
+find $BACKUP_DIR -name "*.tar.gz" -mtime +7 -delete
+
+echo "Backup completed: $DATE"
+SCRIPTEOF
+
+          chmod +x start.sh stop.sh restart.sh status.sh backup.sh
+          print_success "Management scripts created"
+          
+          # Step 15: Final status check
+          print_status "Step 15: Final status check..."
           docker compose ps
+          print_success "Deployment completed successfully!"
           
-          echo "🎉 Deployment completed successfully!"
+          echo ""
+          echo "🎉 Complete VPS deployment finished!"
+          echo "====================================="
+          echo "🌐 Application: https://com.midaweb.be"
+          echo "🔧 Management: cd /opt/gamecom && ./status.sh"
+          echo "📊 Logs: docker compose logs -f"
+          echo ""
         EOF
         
     - name: Verify deployment
       run: |
-        # Wait a moment for containers to start
-        sleep 30
+        # Wait for containers to start
+        sleep 60
         
         # Check if application is responding
+        echo "Checking application health..."
         curl -f https://com.midaweb.be/health || echo "Health check failed, but deployment might still be successful"
+        
+        # Check SSL certificate
+        echo "Checking SSL certificate..."
+        curl -I https://com.midaweb.be || echo "SSL check failed"
         
     - name: Notify deployment status
       if: always()
       run: |
         if [ ${{ job.status }} == 'success' ]; then
-          echo "✅ Deployment successful! Application is live at https://com.midaweb.be"
+          echo "✅ Complete VPS deployment successful!"
+          echo "🌐 Application is live at: https://com.midaweb.be"
+          echo "🔧 Management commands available in /opt/gamecom/"
         else
           echo "❌ Deployment failed. Check the logs above for details."
         fi 

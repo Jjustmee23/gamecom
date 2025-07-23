@@ -7,6 +7,7 @@ echo "🔧 GitHub Actions VPS Setup Script"
 echo "=================================="
 echo "VPS: 45.154.238.116"
 echo "Repository: https://github.com/Jjustmee23/gamecom"
+echo "Email: info@midaweb.be"
 echo ""
 
 # Colors
@@ -32,10 +33,10 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if running on VPS
-if [[ "$(hostname)" != *"45.154.238.116"* ]]; then
-    print_error "This script should be run on the VPS (45.154.238.116)"
-    exit 1
+# Check if running as root
+if [[ $EUID -ne 0 ]]; then
+   print_error "This script must be run as root (use sudo)"
+   exit 1
 fi
 
 print_status "Setting up GitHub Actions deployment..."
@@ -43,7 +44,7 @@ print_status "Setting up GitHub Actions deployment..."
 # Step 1: Create deployment user
 print_status "Step 1: Creating deployment user..."
 if ! id "github-actions" &>/dev/null; then
-    sudo useradd -m -s /bin/bash github-actions
+    useradd -m -s /bin/bash github-actions
     print_success "Created github-actions user"
 else
     print_warning "github-actions user already exists"
@@ -63,6 +64,8 @@ sudo chmod 700 /home/github-actions/.ssh
 # Step 4: Give github-actions user access to application directory
 print_status "Step 4: Setting up application directory permissions..."
 sudo usermod -aG docker github-actions
+sudo usermod -aG sudo github-actions
+sudo mkdir -p /opt/gamecom
 sudo chown -R github-actions:github-actions /opt/gamecom
 
 # Step 5: Create deployment script for github-actions user
@@ -121,14 +124,22 @@ echo ""
 echo "3. Add these repository secrets:"
 echo "   - VPS_SSH_KEY: (paste the private key above)"
 echo "   - VPS_USER: github-actions"
+echo "   - GITHUB_TOKEN: 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"
 echo ""
 echo "4. The GitHub Actions workflow is already configured in .github/workflows/deploy.yml"
 echo ""
-echo "5. Push to main branch to trigger deployment:"
+echo "5. Push to main branch to trigger complete deployment:"
 echo "   git add ."
-echo "   git commit -m 'Update application'"
+echo "   git commit -m 'Trigger complete VPS deployment'"
 echo "   git push origin main"
 echo ""
 echo "✅ Setup completed! Your VPS will now automatically deploy on every push to main branch."
 echo ""
-echo "🌐 Application will be available at: https://com.midaweb.be" 
+echo "🌐 Application will be available at: https://com.midaweb.be"
+echo ""
+echo "📋 What will be installed automatically:"
+echo "   - All system packages (Docker, Nginx, PostgreSQL, etc.)"
+echo "   - SSL certificate for com.midaweb.be"
+echo "   - Complete application setup"
+echo "   - Management scripts"
+echo "   - Backup system" 
