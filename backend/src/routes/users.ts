@@ -98,7 +98,7 @@ router.get('/profile/:id', async (req: any, res: any) => {
 
     if (userResult.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
-    }
+  }
 
     const user = userResult.rows[0];
 

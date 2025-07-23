@@ -203,6 +203,9 @@ export async function createTables() {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_game_forum_posts_game_id ON game_forum_posts(game_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_user_game_library_user_id ON user_game_library(user_id)`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_user_game_achievements_user_id ON user_game_achievements(user_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_friendships_user_id ON friendships(user_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_friendships_friend_id ON friendships(friend_id)`);
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status)`);
 
     console.log('Database tables created successfully');
   } catch (error) {
