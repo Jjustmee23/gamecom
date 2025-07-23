@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # Redis for sessions and caching
+  redis:
+    image: redis:7-alpine
+    container_name: gamecom-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - gamecom-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gamecom-backend
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://danny:Jjustmee12773@45.154.238.111:5432/gamecom
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: your-super-secret-jwt-key-change-in-production
+      STEAM_API_KEY: ${STEAM_API_KEY}
+      PORT: 3001
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      - redis
+    networks:
+      - gamecom-network
+    command: npm run dev
+
+  # Frontend React App
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: gamecom-frontend
+    environment:
+      VITE_API_URL: http://localhost:3001
+      VITE_WS_URL: ws://localhost:3001
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - gamecom-network
+    command: npm run dev
+
+volumes:
+  redis_data:
+
+networks:
+  gamecom-network:
+    driver: bridge 
